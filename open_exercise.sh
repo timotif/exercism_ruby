@@ -34,11 +34,21 @@ else
   exit 1
 fi
 
-RB_FILE="${EXERCISE//-/_}.rb"
-if [[ ! -f "$EX_DIR/$RB_FILE" ]]; then
-  echo "Ruby file not found: $EX_DIR/$RB_FILE" >&2
+RB_CANDIDATES=()
+while IFS= read -r -d '' f; do
+  RB_CANDIDATES+=("$(basename "$f")")
+done < <(find "$EX_DIR" -maxdepth 1 -iname '*.rb' ! -iname '*test*' -print0)
+
+if [[ ${#RB_CANDIDATES[@]} -eq 0 ]]; then
+  echo "No non-test .rb file found in: $EX_DIR" >&2
+  exit 1
+elif [[ ${#RB_CANDIDATES[@]} -gt 1 ]]; then
+  echo "Multiple non-test .rb files found in $EX_DIR: ${RB_CANDIDATES[*]}" >&2
+  echo "Please disambiguate manually." >&2
   exit 1
 fi
+
+RB_FILE="${RB_CANDIDATES[0]}"
 
 INTRO="$EX_DIR/.docs/introduction.md"
 INSTRUCTIONS="$EX_DIR/.docs/instructions.md"
