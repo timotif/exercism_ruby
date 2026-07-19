@@ -1,11 +1,17 @@
 module Port
   # TODO: define the 'IDENTIFIER' constant
+  IDENTIFIER = :PALE
 
   def self.get_identifier(city)
-    raise 'Please implement the Port.get_identifier method'
+    city.slice(0..3).upcase.to_sym
   end
 
   def self.get_terminal(ship_identifier)
-    raise 'Please implement the Port.get_terminal method'
+    cargo = ship_identifier[0..2].to_s
+    if cargo == "OIL" or cargo == "GAS"
+      :A
+    else
+      :B
+    end
   end
 end

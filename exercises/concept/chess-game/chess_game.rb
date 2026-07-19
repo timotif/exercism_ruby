@@ -1,16 +1,24 @@
 module Chess
-  # TODO: define the 'RANKS' constant
-  # TODO: define the 'FILES' constant
+  RANKS = (1..8)
+  FILES = ("A".."H")
 
   def self.valid_square?(rank, file)
-    raise "Please implement the Chess.valid_square? method"
+    if rank in RANKS and file in FILES
+      true
+    else
+      false
+    end
   end
 
   def self.nickname(first_name, last_name)
-    raise "Please implement the Chess.nickname method"
+    (first_name[0..1] + last_name[-2..]).upcase
   end
 
   def self.move_message(first_name, last_name, square)
-    raise "Please implement the Chess.move_message method"
+    if self.valid_square?(square[1].to_i, square[0]) == true
+      "#{self.nickname(first_name, last_name)} moved to #{square}"
+    else
+      "#{self.nickname(first_name, last_name)} attempted to move to #{square}, but that is not a valid square"
+    end
   end
 end
