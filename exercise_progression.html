@@ -1,0 +1,168 @@
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Exercism Ruby Progress</title>
+  <style>
+    body { font-family: sans-serif; padding: 2rem; max-width: 700px; margin: 0 auto; background: #0f1117; color: #e2e8f0; }
+    h1 { font-size: 1.4rem; margin-bottom: 1rem; }
+    ol { padding-left: 2rem; }
+    li { margin: 0.3rem 0; }
+    a { text-decoration: none; color: #60a5fa; }
+    a:hover { text-decoration: underline; }
+    .badge {
+      display: inline-block;
+      font-size: 0.7rem;
+      padding: 1px 6px;
+      border-radius: 4px;
+      margin-right: 6px;
+      font-weight: bold;
+      vertical-align: middle;
+    }
+    .completed { background: #064e3b; color: #6ee7b7; }
+    .started   { background: #451a03; color: #fcd34d; }
+    .available { background: #1e293b; color: #94a3b8; }
+    .concept   { font-size: 0.65rem; color: #64748b; margin-left: 4px; }
+    .practice  { font-size: 0.65rem; color: #64748b; margin-left: 4px; }
+  </style>
+</head>
+<body>
+  <h1>Exercism Ruby — Exercise Progression</h1>
+  <ol id="list"></ol>
+  <script>
+    const exercises = [
+      { slug: "hello-world", status: "completed", type: "practice" },
+      { slug: "lasagna", status: "completed", type: "concept" },
+      { slug: "amusement-park", status: "completed", type: "concept" },
+      { slug: "amusement-park-improvements", status: "completed", type: "concept" },
+      { slug: "log-line-parser", status: "completed", type: "concept" },
+      { slug: "assembly-line", status: "completed", type: "concept" },
+      { slug: "savings-account", status: "completed", type: "concept" },
+      { slug: "port-palermo", status: "completed", type: "concept" },
+      { slug: "chess-game", status: "completed", type: "concept" },
+      { slug: "blackjack", status: "completed", type: "concept" },
+      { slug: "bird-count", status: "completed", type: "concept" },
+      { slug: "boutique-inventory", status: "completed", type: "concept" },
+      { slug: "boutique-inventory-improvements", status: "started", type: "concept" },
+      { slug: "locomotive-engineer", status: "available", type: "concept" },
+      { slug: "last-will", status: "available", type: "concept" },
+      { slug: "moviegoer", status: "available", type: "concept" },
+      { slug: "simple-calculator", status: "available", type: "concept" },
+      { slug: "two-fer", status: "available", type: "practice" },
+      { slug: "resistor-color-duo", status: "available", type: "practice" },
+      { slug: "acronym", status: "available", type: "practice" },
+      { slug: "high-scores", status: "available", type: "practice" },
+      { slug: "reverse-string", status: "available", type: "practice" },
+      { slug: "dnd-character", status: "available", type: "practice" },
+      { slug: "matrix", status: "available", type: "practice" },
+      { slug: "series", status: "available", type: "practice" },
+      { slug: "word-count", status: "available", type: "practice" },
+      { slug: "eliuds-eggs", status: "available", type: "practice" },
+      { slug: "hamming", status: "available", type: "practice" },
+      { slug: "raindrops", status: "available", type: "practice" },
+      { slug: "isogram", status: "available", type: "practice" },
+      { slug: "scrabble-score", status: "available", type: "practice" },
+      { slug: "luhn", status: "available", type: "practice" },
+      { slug: "clock", status: "available", type: "practice" },
+      { slug: "twelve-days", status: "available", type: "practice" },
+      { slug: "tournament", status: "available", type: "practice" },
+      { slug: "gigasecond", status: "available", type: "practice" },
+      { slug: "resistor-color", status: "available", type: "practice" },
+      { slug: "rna-transcription", status: "available", type: "practice" },
+      { slug: "leap", status: "available", type: "practice" },
+      { slug: "pangram", status: "available", type: "practice" },
+      { slug: "space-age", status: "available", type: "practice" },
+      { slug: "triangle", status: "available", type: "practice" },
+      { slug: "difference-of-squares", status: "available", type: "practice" },
+      { slug: "anagram", status: "available", type: "practice" },
+      { slug: "spiral-matrix", status: "available", type: "practice" },
+      { slug: "sum-of-multiples", status: "available", type: "practice" },
+      { slug: "transpose", status: "available", type: "practice" },
+      { slug: "armstrong-numbers", status: "available", type: "practice" },
+      { slug: "flatten-array", status: "available", type: "practice" },
+      { slug: "phone-number", status: "available", type: "practice" },
+      { slug: "grains", status: "available", type: "practice" },
+      { slug: "resistor-color-trio", status: "available", type: "practice" },
+      { slug: "saddle-points", status: "available", type: "practice" },
+      { slug: "etl", status: "available", type: "practice" },
+      { slug: "nucleotide-count", status: "available", type: "practice" },
+      { slug: "pythagorean-triplet", status: "available", type: "practice" },
+      { slug: "collatz-conjecture", status: "available", type: "practice" },
+      { slug: "sieve", status: "available", type: "practice" },
+      { slug: "proverb", status: "available", type: "practice" },
+      { slug: "palindrome-products", status: "available", type: "practice" },
+      { slug: "parallel-letter-frequency", status: "available", type: "practice" },
+      { slug: "bob", status: "available", type: "practice" },
+      { slug: "nth-prime", status: "available", type: "practice" },
+      { slug: "perfect-numbers", status: "available", type: "practice" },
+      { slug: "alphametics", status: "available", type: "practice" },
+      { slug: "binary-search", status: "available", type: "practice" },
+      { slug: "two-bucket", status: "available", type: "practice" },
+      { slug: "matching-brackets", status: "available", type: "practice" },
+      { slug: "all-your-base", status: "available", type: "practice" },
+      { slug: "allergies", status: "available", type: "practice" },
+      { slug: "rail-fence-cipher", status: "available", type: "practice" },
+      { slug: "run-length-encoding", status: "available", type: "practice" },
+      { slug: "flower-field", status: "available", type: "practice" },
+      { slug: "robot-simulator", status: "available", type: "practice" },
+      { slug: "bottle-song", status: "available", type: "practice" },
+      { slug: "protein-translation", status: "available", type: "practice" },
+      { slug: "wordy", status: "available", type: "practice" },
+      { slug: "secret-handshake", status: "available", type: "practice" },
+      { slug: "atbash-cipher", status: "available", type: "practice" },
+      { slug: "crypto-square", status: "available", type: "practice" },
+      { slug: "list-ops", status: "available", type: "practice" },
+      { slug: "robot-name", status: "available", type: "practice" },
+      { slug: "simple-cipher", status: "available", type: "practice" },
+      { slug: "dominoes", status: "available", type: "practice" },
+      { slug: "pig-latin", status: "available", type: "practice" },
+      { slug: "simple-linked-list", status: "available", type: "practice" },
+      { slug: "binary-search-tree", status: "available", type: "practice" },
+      { slug: "change", status: "available", type: "practice" },
+      { slug: "circular-buffer", status: "available", type: "practice" },
+      { slug: "grade-school", status: "available", type: "practice" },
+      { slug: "roman-numerals", status: "available", type: "practice" },
+      { slug: "rotational-cipher", status: "available", type: "practice" },
+      { slug: "affine-cipher", status: "available", type: "practice" },
+      { slug: "kindergarten-garden", status: "available", type: "practice" },
+      { slug: "largest-series-product", status: "available", type: "practice" },
+      { slug: "prime-factors", status: "available", type: "practice" },
+      { slug: "custom-set", status: "available", type: "practice" },
+      { slug: "house", status: "available", type: "practice" },
+      { slug: "linked-list", status: "available", type: "practice" },
+      { slug: "poker", status: "available", type: "practice" },
+      { slug: "isbn-verifier", status: "available", type: "practice" },
+      { slug: "complex-numbers", status: "available", type: "practice" },
+      { slug: "meetup", status: "available", type: "practice" },
+      { slug: "diamond", status: "available", type: "practice" },
+      { slug: "bowling", status: "available", type: "practice" },
+      { slug: "ocr-numbers", status: "available", type: "practice" },
+      { slug: "say", status: "available", type: "practice" },
+      { slug: "zipper", status: "available", type: "practice" },
+      { slug: "grep", status: "available", type: "practice" },
+      { slug: "food-chain", status: "available", type: "practice" },
+      { slug: "pascals-triangle", status: "available", type: "practice" },
+      { slug: "queen-attack", status: "available", type: "practice" },
+      { slug: "yacht", status: "available", type: "practice" },
+      { slug: "book-store", status: "available", type: "practice" },
+      { slug: "connect", status: "available", type: "practice" },
+      { slug: "microwave", status: "available", type: "practice" },
+      { slug: "darts", status: "available", type: "practice" },
+      { slug: "bank-account", status: "available", type: "practice" },
+      { slug: "gilded-rose", status: "available", type: "practice" },
+      { slug: "knapsack", status: "available", type: "practice" },
+      { slug: "zebra-puzzle", status: "available", type: "practice" },
+    ]
+
+    const ol = document.getElementById('list')
+    exercises.forEach((ex, i) => {
+      const li = document.createElement('li')
+      li.innerHTML = `
+        <span class="badge ${ex.status}">${ex.status}</span>
+        <a href="https://exercism.org/tracks/ruby/exercises/${ex.slug}" target="_blank">${ex.slug}</a>
+        <span class="${ex.type}">${ex.type}</span>
+      `
+      ol.appendChild(li)
+    })
+  </script>
+</body>
+</html>
