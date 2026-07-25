@@ -1,5 +1,4 @@
 module Port
-  # TODO: define the 'IDENTIFIER' constant
   IDENTIFIER = :PALE
 
   def self.get_identifier(city)
