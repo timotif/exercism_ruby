@@ -44,3 +44,19 @@ route = { from: "Berlin", to: "Hamburg" }
 ```
 
 Found while working on: `locomotive-engineer` — `add_missing_stops`, avoiding `route[:stops] = ...` mutating the argument in place.
+
+## `*` vs `**` in a method signature: match the splat to what the caller is actually sending
+
+`*args` collects **positional** arguments into an Array. `**kwargs` collects **keyword** arguments (`key: value` pairs) into a Hash. Both can be technically legal for the same call site, which hides the mistake: if a method only has `*stops` and you call it with `stop_1: "a", stop_2: "b"`, Ruby doesn't error — it falls back to treating the trailing keyword pairs as a single implicit positional Hash argument, so `*stops` ends up as `[{stop_1: "a", stop_2: "b"}]` (an array containing one hash), not the flat list you'd expect.
+
+That extra layer of wrapping then forces awkward workarounds downstream (e.g. needing `flat_map(&:values)` to dig the values out through the array-then-hash nesting) that wouldn't be necessary at all with the right splat:
+
+```ruby
+def add_missing_stops(route, **stops)
+  { **route, stops: stops.values }
+end
+```
+
+With `**stops`, Ruby collects the keyword arguments directly into a Hash — no wrapping array — so `.values` alone gives the flat list. The lesson: when a call site passes `key: value` pairs, reach for `**`, not `*` — don't let "it happens to run" stand in for "it's the right parameter type." If you find yourself flattening or unwrapping an extra layer right after collecting args, that's a signal the splat type doesn't match what's actually being passed in.
+
+Found while working on: `locomotive-engineer` — `add_missing_stops`; originally written with `*stops` + `flat_map(&:values)`, simplified to `**stops` + `.values` after comparing with community solutions.
