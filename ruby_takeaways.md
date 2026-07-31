@@ -60,3 +60,15 @@ end
 With `**stops`, Ruby collects the keyword arguments directly into a Hash — no wrapping array — so `.values` alone gives the flat list. The lesson: when a call site passes `key: value` pairs, reach for `**`, not `*` — don't let "it happens to run" stand in for "it's the right parameter type." If you find yourself flattening or unwrapping an extra layer right after collecting args, that's a signal the splat type doesn't match what's actually being passed in.
 
 Found while working on: `locomotive-engineer` — `add_missing_stops`; originally written with `*stops` + `flat_map(&:values)`, simplified to `**stops` + `.values` after comparing with community solutions.
+
+## `def self.foo` vs `def foo` inside a class — attaches to the class or to instances
+
+`def foo` inside a class body defines an **instance** method — it only exists on objects created via `SomeClass.new`, and needs one in hand to call (`obj.foo`). `def self.foo` attaches the method to the class object itself, callable directly as `SomeClass.foo`, no instance required.
+
+Cross-language comparison that made it click:
+- **Python**: `self` there is just the conventional first parameter name of every instance method — an argument, not a definition-site marker. It answers a different question than Ruby's `self.` does.
+- **C++**: `static` is the closer match. A plain method needs an instance (`EstateExecutor e; e.foo();`); a `static` method is called on the type directly (`EstateExecutor::foo()`) — same split as Ruby's `def self.foo`.
+
+The bug this surfaced from: writing `def assemble_account_number` (no `self.`) inside `class EstateExecutor`, then calling `EstateExecutor.assemble_account_number(...)` directly with no instance ever created — `assert_respond_to` failed because the method only existed on instances, not on the class.
+
+Found while working on: `last-will` — `EstateExecutor.assemble_account_number` / `assemble_code`, needed `self.` to be callable directly on the class.
