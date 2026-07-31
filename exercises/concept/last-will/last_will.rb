@@ -61,3 +61,15 @@ class Garcia
 end
 
 # Enter your code below
+class EstateExecutor
+  def self.assemble_account_number(secret_modifier)
+    ::Zhang::bank_number_part(secret_modifier) + ::Khan::bank_number_part(secret_modifier) + ::Garcia::bank_number_part(secret_modifier)
+  end
+
+  def self.assemble_code
+    blue = ::Zhang::Blue::code_fragment + ::Khan::Blue::code_fragment + ::Garcia::Blue::code_fragment
+    red = ::Zhang::Red::code_fragment + ::Khan::Red::code_fragment + ::Garcia::Red::code_fragment
+    blue * red
+  end
+end
+
