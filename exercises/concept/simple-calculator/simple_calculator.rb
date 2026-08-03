@@ -5,10 +5,10 @@ class SimpleCalculator
   end
 
   def self.calculate(first_operand, second_operand, operation)
-    if not ALLOWED_OPERATIONS.include?(operation)
+    unless ALLOWED_OPERATIONS.include?(operation)
       raise UnsupportedOperation.new("Operation not supported")
     end
-    if not first_operand.is_a?(Integer) or not second_operand.is_a?(Integer)
+    unless first_operand.is_a?(Integer) and second_operand.is_a?(Integer)
       raise ArgumentError.new("Wrong argument")
     end
     case operation
