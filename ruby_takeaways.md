@@ -72,3 +72,11 @@ Cross-language comparison that made it click:
 The bug this surfaced from: writing `def assemble_account_number` (no `self.`) inside `class EstateExecutor`, then calling `EstateExecutor.assemble_account_number(...)` directly with no instance ever created — `assert_respond_to` failed because the method only existed on instances, not on the class.
 
 Found while working on: `last-will` — `EstateExecutor.assemble_account_number` / `assemble_code`, needed `self.` to be callable directly on the class.
+
+## `raise` needs an instance (`.new`), not a bare call
+
+`raise SomeError("message")` looks like it should work — it reads like passing a message to the exception — but Ruby parses `SomeError("message")` as a **method call** named `SomeError`, not as constructing an exception. Since no such method exists, it blows up with `NoMethodError: undefined method 'SomeError'` instead of raising the exception you meant.
+
+The fix is to actually instantiate the exception first: `raise SomeError.new("message")`. `raise` expects an *exception object* (or a class it can instantiate itself with no custom message, e.g. bare `raise SomeError`) — it doesn't have special syntax that turns `ClassName(args)` into construction the way a real constructor call would in some other languages.
+
+Found while working on: `simple-calculator` — `raise ArgumentError("Wrong argument")` raised `NoMethodError` instead of `ArgumentError`; fixed by writing `raise ArgumentError.new("Wrong argument")`.
