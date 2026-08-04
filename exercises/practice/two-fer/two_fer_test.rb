@@ -10,14 +10,14 @@ class TwoFerTest < Minitest::Test
   end
 
   def test_a_name_given
-    skip
+    # skip
     actual = TwoFer.two_fer('Alice')
     expected = 'One for Alice, one for me.'
     assert_equal expected, actual
   end
 
   def test_another_name_given
-    skip
+    # skip
     actual = TwoFer.two_fer('Bob')
     expected = 'One for Bob, one for me.'
     assert_equal expected, actual

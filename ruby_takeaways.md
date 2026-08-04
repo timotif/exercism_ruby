@@ -80,3 +80,54 @@ Found while working on: `last-will` — `EstateExecutor.assemble_account_number`
 The fix is to actually instantiate the exception first: `raise SomeError.new("message")`. `raise` expects an *exception object* (or a class it can instantiate itself with no custom message, e.g. bare `raise SomeError`) — it doesn't have special syntax that turns `ClassName(args)` into construction the way a real constructor call would in some other languages.
 
 Found while working on: `simple-calculator` — `raise ArgumentError("Wrong argument")` raised `NoMethodError` instead of `ArgumentError`; fixed by writing `raise ArgumentError.new("Wrong argument")`.
+
+## Default parameter values replace manual arity-checking for optional args
+
+Ruby doesn't have method overloading (no picking a method body by argument count like Java/C++). The idiomatic way to make an argument optional is to give the parameter a default value in the signature: `def foo(name = "default")`. If the caller omits the argument, Ruby fills in the default; if they pass one, it overrides it.
+
+This replaces the pattern of accepting a splat and then branching on how many arguments showed up:
+
+```ruby
+# Before: manual arity check
+def foo(*args)
+  case args.size
+  when 0
+    "default case"
+  else
+    "got #{args[0]}"
+  end
+end
+
+# After: default value does the branching for you
+def foo(name = "default value")
+  "got #{name}"
+end
+```
+
+The splat+case version works, but it's solving a problem Ruby already has a direct feature for — the default-value syntax collapses the whole branch into the method signature itself.
+
+Found while working on: `two-fer` — original solution used `def self.two_fer(*args)` with `case args.size`; simplified to `def self.two_fer(name="you")`.
+
+## `class` vs `module`: use a module when there's no instance state
+
+A `class` is a blueprint for creating objects (`SomeClass.new`) that carry their own state and identity. If a "class" never uses `@instance_variables` and is only ever called via `self.` methods (never instantiated), the `class` keyword is misleading — it implies `.new` is a meaningful, intended operation, when actually it isn't.
+
+A `module` can't be instantiated at all — `SomeModule.new` raises `NoMethodError`. Using `module` instead of `class` for a stateless container of methods communicates "this is just a namespace/utility grouping" through the type system itself, rather than relying on the reader to notice the class is never instantiated. The `def self.method_name` syntax for defining a module-level method is identical to the `def self.method_name` pattern for class-level methods (see the `def self.foo` entry above) — only the surrounding keyword changes.
+
+```ruby
+# Misleading: implies TwoFer.new has meaning, but it never does
+class TwoFer
+  def self.two_fer(name = "you")
+    "One for #{name}, one for me."
+  end
+end
+
+# Clearer: TwoFer is just a container, instantiation isn't even possible
+module TwoFer
+  def self.two_fer(name = "you")
+    "One for #{name}, one for me."
+  end
+end
+```
+
+Found while working on: `two-fer` — automatic evaluator flagged the class-based solution; converted `class TwoFer` to `module TwoFer` with no other changes needed, tests still passed.
