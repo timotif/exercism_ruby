@@ -17,6 +17,10 @@ module Acronym
 #      .upcase
 #  end
   def self.abbreviate(words)
-    words.gsub(/[^a-zA-Z0-9\s\-]/, "").scan(/\w+/).map { |word| word[0].upcase }.join
+    words
+      .gsub(/[^a-zA-Z0-9\s\-]/, "")  # delete everything but alphanum, spaces and -
+      .scan(/\w+/)                   # split into words (returns array)
+      .map { |word| word[0].upcase } # extract first char (illegal ones were already stripped) and capitalize
+      .join                          # combine into final acronym
   end
 end
