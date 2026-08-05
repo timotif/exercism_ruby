@@ -168,3 +168,43 @@ colors.reverse.each_with_index { |color, exponent| res += VALUES[color.to_sym] *
 The second version removes the state-management side effect (`exponent += 1`) from the block entirely — the block just computes, it doesn't also track its own progress through the loop.
 
 Found while working on: `resistor-color-duo` — `ResistorColorDuo.value`, converting colors + position into a two-digit number arithmetically instead of via string concatenation.
+
+## `find` returns one element, `select`/`filter` returns a subset — don't reach for the wrong one
+
+`select`/`filter { |x| ... }` walks the whole collection and keeps every element where the block is truthy — it returns a **subset**, same type as the original, never fewer than "match or not" per element. It can't *extract a piece* of an element; it can only decide whether the whole element survives.
+
+`find`/`detect { |x| ... }` walks the collection and returns the **first single element** where the block is truthy — nothing more, nothing less.
+
+The bug this caused: trying to pull "the first letter of this word that's actually a letter" (to handle a word like `"_Not_"`, where index `0` is punctuation, not the real first letter) using `word.chars.select { |char| char.match(/[a-zA-Z]/) }` — that returns *every* letter in the word, not just the first. `find` was the right tool: `word.chars.find { |char| char.match(/[a-zA-Z]/) }` stops and returns as soon as it hits `"N"`.
+
+```ruby
+"_Not_".chars.select { |c| c.match(/[a-zA-Z]/) }  # => ["N", "o", "t"] — wrong tool, wrong shape
+"_Not_".chars.find   { |c| c.match(/[a-zA-Z]/) }  # => "N"             — right tool
+```
+
+Found while working on: `acronym` — `Acronym.abbreviate`, extracting the first real letter of `"_Not_"` inside `"The Road _Not_ Taken"`.
+
+## `gsub` + `scan` to extract "valid word chunks" beats `split` + filter-the-empties-after
+
+`split(/[ -]/)` on a phrase with **consecutive** delimiters (e.g. `"Something - I made up"`, where a hyphen sits between two spaces) produces empty-string elements in the result — there's nothing between two adjacent delimiters. `split` also doesn't know anything about "what a valid word looks like"; it just cuts at the delimiter and leaves whatever punctuation happens to be at the edges (e.g. `"_Not_"` from `"The Road _Not_ Taken"`), pushing the cleanup into a later step.
+
+Flipping the strategy — delete everything that *isn't* allowed first, then scan for word-shaped chunks — avoids both problems at once:
+
+```ruby
+value.gsub(/[^a-zA-Z0-9\s\-]/, "")   # strip anything that isn't a letter/digit/space/hyphen
+     .scan(/\w+/)                    # pull out every maximal run of word-characters
+     .map { |word| word[0].upcase }  # scan already guarantees each chunk starts on a real char
+     .join
+```
+
+`\w+` (one-or-more word-characters) can never match an empty string and can never start mid-punctuation — so there's no empty-string case to `reject`, and no leading-underscore case to `find` around. The `gsub` pre-pass removes underscores/apostrophes/etc. before `scan` ever runs, so `\w+` only ever lands on real letters/digits.
+
+Found while working on: `acronym` — `Acronym.abbreviate`; the `split` + `reject(&:empty?)` + `chars.find` version worked but took three separate fixes to reach; the `gsub`+`scan` version handles consecutive delimiters and stray punctuation in one pass.
+
+## Character-class syntax: `[^...]` negates, `\s`/`\w` are shorthand classes
+
+Inside a regex character class (`[...]`), a `^` as the **first character** flips its meaning to negation — `[^abc]` means "any character *not* a, b, or c." (Outside a character class, `^` means something unrelated: start-of-string/line anchor.)
+
+`\s` and `\w` are built-in shorthand character classes: `\s` = any whitespace character (space, tab, newline); `\w` = any word character (letters, digits, and underscore). They can be used standalone (`\w+`) or combined inside a custom class (`[^a-zA-Z0-9\s\-]` = "not a letter, digit, whitespace, or hyphen").
+
+Found while working on: `acronym` — reading `gsub(/[^a-zA-Z0-9\s\-]/, "")`, a solution pulled from outside the session rather than derived step-by-step.

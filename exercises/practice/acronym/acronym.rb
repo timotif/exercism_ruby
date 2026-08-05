@@ -5,3 +5,18 @@ Write your code for the 'Acronym' exercise in this file. Make the tests in
 To get started with TDD, see the `README.md` file in your
 `ruby/acronym` directory.
 =end
+module Acronym
+#  def self.abbreviate(words)
+#    words.split(/[ -]/)
+#      .each
+#      .map { |word| 
+#        word.chars.find { |char|
+#          char.match(/[a-zA-Z]/) }
+#      }
+#      .join
+#      .upcase
+#  end
+  def self.abbreviate(words)
+    words.gsub(/[^a-zA-Z0-9\s\-]/, "").scan(/\w+/).map { |word| word[0].upcase }.join
+  end
+end
