@@ -131,3 +131,40 @@ end
 ```
 
 Found while working on: `two-fer` — automatic evaluator flagged the class-based solution; converted `class TwoFer` to `module TwoFer` with no other changes needed, tests still passed.
+
+## Passing an array as one argument doesn't auto-splat into `*args`
+
+`*args` collects **however many positional arguments the caller actually sent** into an Array — it doesn't reach into an array you pass and spread its contents out. Calling `foo(*args)` and calling `foo(some_array)` are different: the first spreads `some_array`'s elements as separate arguments, the second sends the whole array as a single argument.
+
+```ruby
+def value(*colors)
+  colors
+end
+
+value("black", "white")    # => ["black", "white"]  — two args, collected normally
+value(["black", "white"])  # => [["black", "white"]] — one arg (an array), wrapped again
+value(*["black", "white"]) # => ["black", "white"]   — splatted at the call site, spreads out
+```
+
+The bug this caused: calling `ResistorColorDuo.value(%w[black white])` against `def self.value(*colors)` — `%w[...]` builds one array, passed as one argument, so `colors` ended up as `[["black", "white"]]` (an array *containing* the array) instead of the flat `["black", "white"]` expected. `color.to_sym` inside the loop then failed because `color` was itself an array, not a string. Fixed by dropping the splat entirely (`def self.value(colors)`) since the caller was always sending one array anyway — matching the parameter style to how the method is actually called, same principle as the `*` vs `**` entry above.
+
+Found while working on: `resistor-color-duo` — `ResistorColorDuo.value`.
+
+## `each_with_index` replaces a hand-rolled counter
+
+If a block needs to know both the current element *and* its position, don't reach for a manually declared counter variable incremented inside the block — `each_with_index` hands you both directly as block parameters.
+
+```ruby
+# Before: manual counter, two jobs mixed into one block
+exponent = 0
+res = 0
+colors.reverse.each { |color| res += VALUES[color.to_sym] * 10**exponent; exponent += 1 }
+
+# After: index comes from the enumerator itself
+res = 0
+colors.reverse.each_with_index { |color, exponent| res += VALUES[color.to_sym] * 10**exponent }
+```
+
+The second version removes the state-management side effect (`exponent += 1`) from the block entirely — the block just computes, it doesn't also track its own progress through the loop.
+
+Found while working on: `resistor-color-duo` — `ResistorColorDuo.value`, converting colors + position into a two-digit number arithmetically instead of via string concatenation.
