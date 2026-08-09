@@ -5,14 +5,14 @@
 #
 # Layout (mirrors the current 4-pane structure):
 #   LEFT column:
-#     pane A top:    nvim <exercise>.rb + <exercise>_test.rb as 2nd vim tab
+#     pane A top:    nvim <exercise>.rb + nvim <exercise>_test.rb as 2 tabs
 #                     (herdr: split right — nvim <exercise>.rb | nvim <exercise>_test.rb,
-#                     since herdr has no vim-tab equivalent to reach for)
+#                     since herdr has no per-pane tabs to reach for)
 #     pane A bottom: test runner terminal (cd into exercise dir)
 #   RIGHT column:
 #     pane B top:    glow docs (introduction.md + instructions.md as 2 tabs;
 #                     herdr has no per-pane tabs, so this becomes 2 stacked panes)
-#     pane B bottom: browser (file:// exercise_progression.html) + nvim as 2nd tab
+#     pane B bottom: browser (file:// exercise_progression.html), single tab
 #                     (herdr: browser launched via xdg-open with no pane of its
 #                     own — it's an external window, not a terminal surface)
 set -euo pipefail
@@ -179,7 +179,8 @@ layout = {
         {
           'pane': {
             'surfaces': [
-              {'type': 'terminal', 'command': f'cd \"{ex_parent}\" && nvim -p \"{exercise}/{rb_file}\" \"{exercise}/{test_file}\"'}
+              {'type': 'terminal', 'command': f'nvim \"{ex_dir}/{rb_file}\"'},
+              {'type': 'terminal', 'command': f'nvim \"{ex_dir}/{test_file}\"'}
             ]
           }
         },
@@ -207,7 +208,7 @@ layout = {
         {
           'pane': {
             'surfaces': [
-              {'type': 'terminal', 'command': f'nvim \"{html}\"'}
+              {'type': 'terminal', 'command': 'true'}
             ]
           }
         }
@@ -223,20 +224,18 @@ WS_REF=$(CMUX_QUIET=1 cmux new-workspace \
   --layout "$LAYOUT" \
   --focus false 2>/dev/null | awk '{print $2}')
 
-# Find the bottom-right pane (last pane in the workspace) and open a browser
-# surface there, then reorder it before the nvim terminal tab.
+# Find the bottom-right pane (last pane in the workspace), add the browser
+# surface there, then close the placeholder terminal so browser is the only tab.
 PANES_JSON=$(CMUX_QUIET=1 cmux list-panes --workspace "$WS_REF" --json 2>/dev/null)
 PANE_HTML=$(echo "$PANES_JSON" | python3 -c "import sys,json; panes=json.load(sys.stdin)['panes']; print(panes[-1]['ref'])")
 PANE_DOCS=$(echo "$PANES_JSON" | python3 -c "import sys,json; panes=json.load(sys.stdin)['panes']; print(panes[-2]['ref'])")
 
-SURF_NVIM=$(CMUX_QUIET=1 cmux list-pane-surfaces --pane "$PANE_HTML" --workspace "$WS_REF" --json 2>/dev/null \
+SURF_PLACEHOLDER=$(CMUX_QUIET=1 cmux list-pane-surfaces --pane "$PANE_HTML" --workspace "$WS_REF" --json 2>/dev/null \
   | python3 -c "import sys,json; print(json.load(sys.stdin)['surfaces'][0]['ref'])")
 
-BROWSER_JSON=$(CMUX_QUIET=1 cmux new-surface --type browser --url "file://$HTML" --pane "$PANE_HTML" --workspace "$WS_REF" --focus false --json 2>/dev/null)
-SURF_BROWSER=$(echo "$BROWSER_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin)['surface_ref'])")
+CMUX_QUIET=1 cmux new-surface --type browser --url "file://$HTML" --pane "$PANE_HTML" --workspace "$WS_REF" --focus false --json >/dev/null 2>&1
 
-# Put browser tab first, nvim tab second
-CMUX_QUIET=1 cmux reorder-surface --surface "$SURF_BROWSER" --before "$SURF_NVIM" --workspace "$WS_REF" 2>&1 | grep -v '^OK' || true
+CMUX_QUIET=1 cmux close-surface --surface "$SURF_PLACEHOLDER" --workspace "$WS_REF" 2>&1 | grep -v '^OK' || true
 
 # Land on introduction.md (first tab of the docs pane)
 SURF_INTRO=$(CMUX_QUIET=1 cmux list-pane-surfaces --pane "$PANE_DOCS" --workspace "$WS_REF" --json 2>/dev/null \
