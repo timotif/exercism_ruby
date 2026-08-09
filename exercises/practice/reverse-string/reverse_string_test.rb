@@ -10,35 +10,35 @@ class ReverserTest < Minitest::Test
   end
 
   def test_a_word
-    skip
+    # skip
     actual = Reverser.reverse("robot")
     expected = "tobor"
     assert_equal expected, actual
   end
 
   def test_a_capitalized_word
-    skip
+    # skip
     actual = Reverser.reverse("Ramen")
     expected = "nemaR"
     assert_equal expected, actual
   end
 
   def test_a_sentence_with_punctuation
-    skip
+    # skip
     actual = Reverser.reverse("I'm hungry!")
     expected = "!yrgnuh m'I"
     assert_equal expected, actual
   end
 
   def test_a_palindrome
-    skip
+    # skip
     actual = Reverser.reverse("racecar")
     expected = "racecar"
     assert_equal expected, actual
   end
 
   def test_an_even_sized_word
-    skip
+    # skip
     actual = Reverser.reverse("drawer")
     expected = "reward"
     assert_equal expected, actual
