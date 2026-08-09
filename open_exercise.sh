@@ -1,14 +1,20 @@
 #!/usr/bin/env bash
 # Usage: open_exercise.sh <exercise-slug>
-# Opens a new cmux workspace for an Exercism Ruby exercise.
+# Opens a new workspace for an Exercism Ruby exercise, using cmux (macOS) or
+# herdr (Linux) — whichever is installed.
 #
 # Layout (mirrors the current 4-pane structure):
 #   LEFT column:
-#     pane A top:    nvim <exercise>.rb
+#     pane A top:    nvim <exercise>.rb + <exercise>_test.rb as 2nd vim tab
+#                     (herdr: split right — nvim <exercise>.rb | nvim <exercise>_test.rb,
+#                     since herdr has no vim-tab equivalent to reach for)
 #     pane A bottom: test runner terminal (cd into exercise dir)
 #   RIGHT column:
-#     pane B top:    glow docs (introduction.md + instructions.md as 2 tabs)
+#     pane B top:    glow docs (introduction.md + instructions.md as 2 tabs;
+#                     herdr has no per-pane tabs, so this becomes 2 stacked panes)
 #     pane B bottom: browser (file:// exercise_progression.html) + nvim as 2nd tab
+#                     (herdr: browser launched via xdg-open with no pane of its
+#                     own — it's an external window, not a terminal surface)
 set -euo pipefail
 
 EXERCISE="${1:-}"
@@ -17,7 +23,16 @@ if [[ -z "$EXERCISE" ]]; then
   exit 1
 fi
 
-REPO_DIR="/Users/tim/VSProjects/exercism_ruby"
+if command -v cmux >/dev/null 2>&1; then
+  WORKSPACE_TOOL=cmux
+elif command -v herdr >/dev/null 2>&1; then
+  WORKSPACE_TOOL=herdr
+else
+  echo "Neither cmux nor herdr found on PATH." >&2
+  exit 1
+fi
+
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONCEPT_DIR="$REPO_DIR/exercises/concept"
 PRACTICE_DIR="$REPO_DIR/exercises/practice"
 HTML="$REPO_DIR/exercise_progression.html"
@@ -52,6 +67,7 @@ RB_FILE="${RB_CANDIDATES[0]}"
 
 INTRO="$EX_DIR/.docs/introduction.md"
 INSTRUCTIONS="$EX_DIR/.docs/instructions.md"
+TEST_FILE="${EXERCISE//-/_}_test.rb"
 
 # ---------------------------------------------------------------------------
 # Update exercise_progression.html
@@ -92,22 +108,54 @@ else:
     print(f"Updated: '{new_slug}' → started")
 PYEOF
 
-# ---------------------------------------------------------------------------
-# Build the cmux workspace using --layout JSON
-# ---------------------------------------------------------------------------
 # Determine glow commands (fall back gracefully if docs missing)
 if [[ -f "$INTRO" ]]; then
-  CMD_INTRO="glow \"$INTRO\""
+  CMD_INTRO="glow -p \"$INTRO\""
 else
   CMD_INTRO="echo 'No introduction.md'"
 fi
 if [[ -f "$INSTRUCTIONS" ]]; then
-  CMD_INSTR="glow \"$INSTRUCTIONS\""
+  CMD_INSTR="glow -p \"$INSTRUCTIONS\""
 else
   CMD_INSTR="echo 'No instructions.md'"
 fi
 
-# Layout: horizontal split (left|right), each side split vertically (top|bottom)
+if [[ "$WORKSPACE_TOOL" == herdr ]]; then
+  # ---------------------------------------------------------------------------
+  # Build the herdr workspace via split-based panes (no layout JSON, no
+  # per-pane tabs — herdr tabs live at the workspace level, so the 2 docs
+  # that shared one cmux pane become 2 stacked panes here).
+  # ---------------------------------------------------------------------------
+  CREATE_JSON=$(herdr workspace create --cwd "$EX_PARENT" --label "$EXERCISE" --no-focus)
+  PANE_RB=$(echo "$CREATE_JSON" | jq -r '.result.root_pane.pane_id')
+
+  PANE_TEST=$(herdr pane split "$PANE_RB" --direction down --ratio 0.6 --cwd "$EX_DIR" --no-focus \
+    | jq -r '.result.pane.pane_id')
+  PANE_TEST2=$(herdr pane split "$PANE_TEST" --direction right --ratio 0.5 --cwd "$EX_DIR" --no-focus \
+    | jq -r '.result.pane.pane_id')
+  PANE_TEST_RB=$(herdr pane split "$PANE_RB" --direction right --ratio 0.27 --cwd "$EX_DIR" --no-focus \
+    | jq -r '.result.pane.pane_id')
+  PANE_INTRO=$(herdr pane split "$PANE_TEST_RB" --direction right --ratio 0.45 --focus \
+    | jq -r '.result.pane.pane_id')
+  PANE_INSTR=$(herdr pane split "$PANE_INTRO" --direction down --ratio 0.5 --no-focus \
+    | jq -r '.result.pane.pane_id')
+
+  herdr pane run "$PANE_RB" "nvim \"$EX_DIR/$RB_FILE\""
+  herdr pane run "$PANE_TEST_RB" "nvim \"$EX_DIR/$TEST_FILE\""
+  herdr pane run "$PANE_INTRO" "$CMD_INTRO"
+  herdr pane run "$PANE_INSTR" "$CMD_INSTR"
+  # PANE_TEST2 stays a bare shell (second terminal, cd'd into exercise dir).
+  # Browser opens externally (xdg-open) — no pane needed to host it.
+  xdg-open "file://$HTML" >/dev/null 2>&1 &
+  herdr workspace focus "$(echo "$CREATE_JSON" | jq -r '.result.workspace.workspace_id')"
+
+  echo "Workspace '$EXERCISE' ready (herdr)"
+  exit 0
+fi
+
+# ---------------------------------------------------------------------------
+# Build the cmux workspace using --layout JSON
+# ---------------------------------------------------------------------------
 LAYOUT=$(python3 -c "
 import json, sys
 
@@ -118,6 +166,7 @@ rb_file   = sys.argv[4]
 cmd_intro = sys.argv[5]
 cmd_instr = sys.argv[6]
 html      = sys.argv[7]
+test_file = sys.argv[8]
 
 layout = {
   'direction': 'horizontal',
@@ -130,7 +179,7 @@ layout = {
         {
           'pane': {
             'surfaces': [
-              {'type': 'terminal', 'command': f'cd \"{ex_parent}\" && nvim \"{exercise}/{rb_file}\"'}
+              {'type': 'terminal', 'command': f'cd \"{ex_parent}\" && nvim -p \"{exercise}/{rb_file}\" \"{exercise}/{test_file}\"'}
             ]
           }
         },
@@ -167,7 +216,7 @@ layout = {
   ]
 }
 print(json.dumps(layout))
-" "$EXERCISE" "$EX_DIR" "$EX_PARENT" "$RB_FILE" "$CMD_INTRO" "$CMD_INSTR" "$HTML")
+" "$EXERCISE" "$EX_DIR" "$EX_PARENT" "$RB_FILE" "$CMD_INTRO" "$CMD_INSTR" "$HTML" "$TEST_FILE")
 
 WS_REF=$(CMUX_QUIET=1 cmux new-workspace \
   --name "$EXERCISE" \
