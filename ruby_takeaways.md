@@ -208,3 +208,91 @@ Inside a regex character class (`[...]`), a `^` as the **first character** flips
 `\s` and `\w` are built-in shorthand character classes: `\s` = any whitespace character (space, tab, newline); `\w` = any word character (letters, digits, and underscore). They can be used standalone (`\w+`) or combined inside a custom class (`[^a-zA-Z0-9\s\-]` = "not a letter, digit, whitespace, or hyphen").
 
 Found while working on: `acronym` — reading `gsub(/[^a-zA-Z0-9\s\-]/, "")`, a solution pulled from outside the session rather than derived step-by-step.
+
+## `attr_reader` takes a symbol naming the method to generate — not the ivar, not a call
+
+`attr_reader :strength` reads oddly at first because none of the obvious guesses are right: `attr_reader @strength` passes the *value* of an as-yet-undefined ivar (nil), and `attr_reader strength` tries to *call* a method named `strength` as an argument, which doesn't exist yet either. `:strength` is a symbol — just a name/label, evaluated as itself, not looked up or dereferenced. `attr_reader` uses that name both to know which method to define and, by convention, which `@ivar` of the same name to return.
+
+```ruby
+attr_reader :strength   # correct — defines `strength` returning @strength
+attr_reader @strength   # wrong — evaluates @strength (nil) as an argument
+attr_reader strength    # wrong — tries to call a method `strength`, NoMethodError
+```
+
+Found while working on: `dnd-character` — exposing `@constitution`/`@strength`/etc. so the test's `character.constitution` calls had a method to land on.
+
+## `self.foo` inside an instance method still means "call on this instance" — even for a name that's also a class method
+
+Inside `initialize` (an instance method), `self` refers to the *instance* being built, not the class. Writing `self.modifier(...)` or even bare `modifier(...)` there looks for an **instance** method called `modifier` — it does not somehow reach up and find `def self.modifier` defined on the class, even though it's the "same class" conceptually. Class methods and instance methods are separate method tables; being inside the class body when either was defined doesn't link them.
+
+```ruby
+class DndCharacter
+  def self.modifier(score)   # lives on the class's method table
+    ((score - 10) / 2).floor
+  end
+
+  def initialize
+    @constitution = ...
+    modifier(@constitution)         # wrong — looks for an *instance* method `modifier`
+    self.modifier(@constitution)    # wrong — same reason, self here is the instance
+    DndCharacter.modifier(@constitution)  # right — names the class explicitly
+  end
+end
+```
+
+The fix is to name the class explicitly at the call site, since there's no instance-level shorthand that reaches a class method.
+
+Found while working on: `dnd-character` — `initialize` computing `@hitpoints` via `modifier`, defined as `self.modifier` per the test's `DndCharacter.modifier(3)` call convention.
+
+## `n.times { }` discards each block result; `n.times.map { }` collects them
+
+`4.times { rand(1..6) }` runs the block 4 times purely for its side effects — the return value of `.times` (with a block) is the original integer, `4`, not an array of what the block produced. If you need the four individual results kept around (to later find the max/min/sum of them), that return value is useless.
+
+Calling `.times` **without** a block returns an `Enumerator` instead of running anything yet. Chaining `.map { ... }` onto that enumerator is what actually runs the block N times *and* collects each result into an array — same trick as `Array.new(4) { rand(1..6) }`, just built from `.times` instead.
+
+```ruby
+4.times { rand(1..6) }        # => 4              (just the integer 4; rolls are discarded)
+4.times.map { rand(1..6) }    # => [3, 6, 1, 4]    (an Enumerator, then .map collects the block's results)
+```
+
+Found while working on: `dnd-character` — `roll`, generating 4 dice results to keep (drop the lowest, sum the top three) rather than 4 throwaway rolls.
+
+## `%i[...]` is `%w[...]` for symbols
+
+`%w[strength dexterity]` builds an array of **strings**: `["strength", "dexterity"]`. `%i[strength dexterity]` builds an array of **symbols** directly: `[:strength, :dexterity]` — no separate `.map(&:to_sym)` pass needed afterward. Same bare-word, whitespace-separated literal syntax, just a different element type.
+
+Found while working on: `dnd-character` — refactoring six hardcoded `@stat = ...` lines, wanting a literal list of stat names as symbols (for hash keys) rather than strings.
+
+## `Enumerable#to_h` with a block skips the intermediate `.map` array
+
+`array.map { |x| [x, f(x)] }.to_h` works, but it's two passes: `map` builds an Array of `[key, value]` pairs, then `.to_h` (no-block form — array-of-pairs → Hash) converts that array. `to_h` also accepts a block directly: `array.to_h { |x| [x, f(x)] }` does both steps in one call, same block, same `[key, value]` return shape per element, no intermediate array kept around.
+
+```ruby
+%i[strength dexterity].map { |name| [name, name.length] }.to_h   # two steps
+%i[strength dexterity].to_h { |name| [name, name.length] }       # one step, same result
+```
+
+This was hard to find by guessing a *new* method name (tried grepping `instance_methods` for `/hash/i` — turned up nothing useful, since the method isn't named after "hash" at all). The lesson: not every transformation has its own uniquely-named method — sometimes an *existing* method (`to_h`, already known as a converter) gains an extra capability via an optional block, which a name-based search won't surface. Checking `ri Array#to_h` directly (rather than grepping for an unknown name) would have shown both forms.
+
+Found while working on: `dnd-character` — collapsing six `@stat = roll` lines into one hash-building step over `%i[strength dexterity ...]`.
+
+**Related trap:** `to_h`, `map`, and `each` all iterate once per element — they differ only in what they *collect* from the block's return value (`to_h` demands `[key, value]` pairs and builds a Hash; `map` collects anything into an Array; `each` collects nothing and just returns the original receiver). Pick the iteration method by what you actually want back, not by momentum from the method you used last. Using `.to_h { |stat| instance_variable_set(...) }` purely to loop — when the block's real job is a side effect and its return value is never used — raised `TypeError: wrong element type Integer at 0 (expected array)`, because `instance_variable_set`'s return value (the value just set, a plain Integer) doesn't satisfy `to_h`'s `[key, value]`-pair contract. `.each { ... }` was the right call: no return-value contract to satisfy, since nothing is being collected.
+
+## `instance_variable_set` / `instance_variable_get`: dynamic ivar names, but they don't create reader methods
+
+Normally you type an instance variable's name literally in source (`@strength = 14`) — Ruby parses `@strength` as "the ivar named strength" at parse time. When the name itself is only known at runtime (e.g. looping over `%i[strength dexterity]`), `object.instance_variable_set("@#{name}", value)` sets it dynamically instead. Two contract details that don't work the way they first look like they should:
+
+- **The name argument must be a String or Symbol *starting with `@`*** — `instance_variable_set(:strength, 8)` raises `NameError: 'strength' is not allowed as an instance variable name`; it has to be `:@strength` or `"@strength"`. The `@` isn't optional decoration, it's how Ruby's object model spells "this is an ivar name" as opposed to any other kind of string.
+- **It sets the ivar on *whatever object you call the method on*** — `some_symbol.instance_variable_set(...)` attaches the ivar to that symbol object, not to "the object being built." Inside `initialize`, that means calling it on `self` (the instance under construction), not on the loop variable holding the stat name.
+- **Setting `@strength` this way does NOT create a `strength` reader method.** `attr_reader :strength` is what manufactures a `strength` method returning `@strength`; `instance_variable_set` only touches the ivar itself. Calling `.strength` afterward without a matching `attr_reader`/getter still raises `NoMethodError`, even though the ivar is genuinely set — proving the ivar exists requires reading it a different way, either `@strength` typed literally in code with a known name, or `instance_variable_get("@strength")` (a String/Symbol name again, not a bare identifier or its already-evaluated value) when the name is dynamic.
+
+```ruby
+%i[strength dexterity].each { |s| self.instance_variable_set("@#{s}", s.length) }
+# ivars now exist: @strength, @dexterity
+
+self.strength                          # NoMethodError — no reader method was ever defined
+self.instance_variable_get("@strength")# => 8, works — reads by name, no method needed
+@strength                              # => 8, works — direct literal ivar access
+```
+
+Found while working on: `dnd-character` — dynamically assigning `@strength`, `@dexterity`, etc. from a `stats` hash's keys inside `initialize`, replacing six hardcoded `@stat = roll...` lines.
