@@ -296,3 +296,29 @@ self.instance_variable_get("@strength")# => 8, works — reads by name, no metho
 ```
 
 Found while working on: `dnd-character` — dynamically assigning `@strength`, `@dexterity`, etc. from a `stats` hash's keys inside `initialize`, replacing six hardcoded `@stat = roll...` lines.
+
+## `Array#transpose` flips rows and columns — no manual index bookkeeping needed
+
+Given a matrix as an array of row-arrays, "extract column `n`" sounds like it needs an accumulator: walk each row, push `row[n]` onto a `column` array. `transpose` does that whole operation in one call — it turns an array of rows into an array of columns (row/column arrays swap roles), so "get column `n`" becomes "get row `n` of the transposed matrix": `@data.transpose[n - 1]`.
+
+```ruby
+data = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
+data.transpose  # => [[1, 4, 7], [2, 5, 8], [3, 6, 9]]
+data.transpose[2]  # => [3, 6, 9] — third column, no index-juggling loop needed
+```
+
+Found while working on: `matrix` — `Matrix#column`, replacing a planned "enumerate rows, push onto column[index]" loop with `@data.transpose[n - 1]`.
+
+## `&:to_i` only works when the symbol names one bare method call — not `&:attr.to_i`
+
+`&:symbol` converts a *symbol* into a proc; the symbol has to be a single method name, like `:to_i`. Writing `&:attr.to_i` doesn't mean "call `.attr` then `.to_i` on each element" — `:attr.to_i` is evaluated **before** the `&` ever sees it, as its own expression: `.to_i` called directly on the *symbol object* `:attr`, which just returns the symbol's `object_id`-ish integer form, not anything related to elements in the collection at all. There's no dot-chaining inside the `&:` shorthand — it only ever holds one bare method name.
+
+```ruby
+%w[1 2 3].map(&:to_i)        # => [1, 2, 3] — correct, :to_i is one bare method name
+%w[1 2 3].map(&:attr.to_i)   # nonsense — :attr.to_i evaluates immediately to some Integer,
+                              # then & tries to turn *that* into a proc; not "call .attr.to_i per element"
+```
+
+If more than one method call is needed per element, `&:` can't express it at all — fall back to a real block (`map { |x| x.attr.to_i }`) or chain separate `&:` maps.
+
+Found while working on: `matrix` — converting split string numbers to integers; reached for `map(&:attr.to_i)` first, out of a mistaken instinct to "name the element" inside the symbol, before landing on plain `map(&:to_i)`.
