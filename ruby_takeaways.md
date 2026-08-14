@@ -322,3 +322,17 @@ Found while working on: `matrix` — `Matrix#column`, replacing a planned "enume
 If more than one method call is needed per element, `&:` can't express it at all — fall back to a real block (`map { |x| x.attr.to_i }`) or chain separate `&:` maps.
 
 Found while working on: `matrix` — converting split string numbers to integers; reached for `map(&:attr.to_i)` first, out of a mistaken instinct to "name the element" inside the symbol, before landing on plain `map(&:to_i)`.
+
+## `Enumerable#map` always returns a plain `Array`, no matter what it was called on
+
+`map` isn't "accumulating" the way a hand-rolled `ret = []; ...; ret.push(...)` loop is — nothing is being mutated and grown step by step. It's defined once, generically, inside the `Enumerable` module, in terms of `each`. Its contract is fixed regardless of receiver: run the block once per yielded element, collect every return value into a **new `Array`**, hand that back. It doesn't try to preserve or mirror whatever type of thing you called it on.
+
+That's why `each_cons(n)` — which itself returns an `Enumerator`, not an `Array` — can still have `.map { ... }` chained straight onto it: `Enumerator` includes `Enumerable` too, so it gets the exact same `map`, with the exact same "always ends in an Array" guarantee. Calling `.map` on an Array, a Hash, a Range, or an Enumerator all funnel through the same method and all come back as an Array (this is also why `hash.map { ... }` surprises people — you get an Array of pairs back, not a Hash).
+
+```ruby
+"12345".chars.each_cons(2).map { |pair| pair.join }
+# each_cons(2) => #<Enumerator: ...>  (not an Array)
+# .map { ... }  => ["12", "23", "34", "45"]  (always an Array, regardless of the receiver's original type)
+```
+
+Found while working on: `series` — `Series#slices`, replacing a manual `while` loop with `@serie.chars.each_cons(n).map { |chunk| chunk.join }`; the confusion was expecting `map`'s output type to somehow depend on what it was called on, rather than it always normalizing to `Array`.
