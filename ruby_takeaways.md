@@ -336,3 +336,20 @@ That's why `each_cons(n)` — which itself returns an `Enumerator`, not an `Arra
 ```
 
 Found while working on: `series` — `Series#slices`, replacing a manual `while` loop with `@serie.chars.each_cons(n).map { |chunk| chunk.join }`; the confusion was expecting `map`'s output type to somehow depend on what it was called on, rather than it always normalizing to `Array`.
+
+## Checking "Array's methods" isn't enough — most of its everyday power comes from `Enumerable`, a separate page
+
+Writing something like:
+
+```ruby
+result = {}
+for w in phrase.split.uniq
+  result[w] = phrase.count(w)
+end
+```
+
+works, but it's solving a problem shape ("for each distinct element, pair it with how many times it occurs") that's common enough to often already have a name. The search for that name failed the first time even though the [Array doc page](https://ruby-doc.org/core-2.5.8/Array.html) was checked directly — because `Array` only *defines* a handful of methods itself; the bulk of what makes it useful (`map`, `select`, `find`, `each_with_index`, `each_cons`, `tally`, `group_by`, `sum`, `to_h`, ...) is `include`d from the `Enumerable` module and inherited, not defined on `Array`. The doc page does list this (an "Included Modules: Enumerable" line near the top, above the method summary), but it's easy to land straight on the method list and never notice the module line — which is exactly what happened here.
+
+The fix isn't "remember more method names," it's a change to *where* to look: `Array`'s own page is the wrong place to search exhaustively for "is there a method for X" — [`Enumerable`'s doc page](https://ruby-doc.org/core-2.5.8/Enumerable.html) is the one with the real breadth, since anything mixing in `Enumerable` (`Array`, `Hash`, `Range`, `Enumerator`, ...) gets that whole method set for free. Same root idea as the `Array#map` entry above (map always returns `Array` regardless of receiver, because it's defined once in `Enumerable`) — this is the doc-navigation consequence of that same fact.
+
+Found while working on: `series` (or nearby) — writing `for w in phrase.split.uniq; result[w] = phrase.count(w); end` to build a word-count hash; checked `Array`'s doc page for an existing method first but missed the "Included Modules: Enumerable" pointer and never checked `Enumerable`'s own page.
